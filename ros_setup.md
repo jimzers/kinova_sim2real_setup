@@ -4,7 +4,7 @@
 
 First make your workspace and python environment. (note: we use `export ROS_PYTHON_VERSION=3` a lot, this tells ROS that we wanna use python3. Even when we're using a python3 virtual environment)
 
-(Note: make sure you have python3, python3-pip, and python3-venv installed beforehand with apt)
+(Note: make sure you have python3, python3-pip, python3-venv, python3-catkin-pkg installed beforehand with apt)
 
 
 ```
@@ -21,7 +21,7 @@ python3 -m venv kinova_venv
 
 # install some python packages woohoo
 pip install -U pip wheel
-pip install numpy torch scipy pandas
+pip install numpy torch scipy pandas opencv-python opencv-contrib-python
 pip uninstall em
 pip install empy
 
