@@ -265,3 +265,40 @@ cmake -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-master/modules ../opencv-mas
 cmake --build .
 ```
 
+
+
+
+
+
+
+# Doing camera calibration
+
+Step 1: Take some pictures
+
+Make a new folder for pictures:
+
+```
+mkdir ~/sim-to-real-kinova/calibration_photos
+```
+
+
+
+TODO:
+
+1. Camera calibration
+2. Get `~/sim-to-real-kinova/src/sim-to-real-kinova-master/grasp_classifier_individual_sim_2_real/src/grasp_classfier_test.py` to work as sanity check. It tests the metrics of aruco markers iirc.
+   1. Need to teleoperate the arm and hard code 4 values (confirm values with nigel) in `kinova_gripper_env.py`:
+      1. starting grasp position for object
+      2. lifting position for object
+      3. move to goal position (moves right)
+      4. move back to original place
+   2. add a few sample "pre-starting" positions in `grasp_classifier_test.py`
+3. Figure out Haonan's stuff more and more.
+
+
+
+Unrelated step: Teleoperate to make the joint angles.
+
+Joint position can be observed by echoing two topics: `/'${kinova_robotType}_driver'/out/joint_angles` (in degree) and `/'${kinova_robotType}_driver'/out/state/position` (in radians including finger information)
+
+**eg**: `rostopic echo -c /m1n4s200_driver/out/joint_state` will print out joint names (rad), position, velocity (rad/s) and effort (Nm) information.
