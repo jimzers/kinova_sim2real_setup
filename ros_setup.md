@@ -150,7 +150,7 @@ python misc/Kinova-simulation-in-Rviz/identify\ aruco\ markers\ in\ image.py
 Code for editing random pieces of stuff. Can probably ignore this section.
 
 ```
-vim src/kinova-ros/kinova_moveit/robot_configs/j2s7s300_moveit_config/launch/j2s7s300_virtual_robot_demo.launch
+vim src/kinova-ros/kinova_moveit/robot_configs/j2s7s300_moveit_config/launch/j2s7s300_virtual_robot_demo.launchTest_11_9
 
 
 vim ~/kinova_rl/src/kinova-ros/kinova_moveit/robot_configs/j2s7s300_moveit_config/launch/planning_context.launch
@@ -222,7 +222,7 @@ python ~/sim-to-real-kinova/src/sim-to-real-kinova-master/object_detection_pkg/s
 
 
 
-and if you have your calibration setup right, you should start publishing to  the ROS topic `/usb_cam/image_raw`
+and if you have your calibration setup right, you should start publishing to  the ROS topic `/usb_cam/image_rawTest_11_9`
 
 go to `~/sim-to-real-kinova/src/sim-to-real-kinova-master/object_detection_pkg/src/camera_cal.py` and make sure line 24 is pointed to the right directory with all your images.
 
@@ -281,6 +281,110 @@ Make a new folder for pictures:
 mkdir ~/sim-to-real-kinova/calibration_photos
 ```
 
+Then, take some photos and place them in that folder.
+
+Step 2: Setup your camera launch files
+
+Go to `cam_launch.launch` (in `src/sim-to-real-kinova-master`) and make sure your `video_device` param.
+
+```
+ls /dev/video*
+# if you can't figure out which video channel to use, try them all lol
+```
+
+Changing example:
+
+```
+<param name="video_device" value="/dev/video0" />
+```
+
+Step 3: Actual calibration. Should pop out a `camera_mtx.npy` and `dist_mtx.npy` at the end of it all.
+
+```
+cd ~/
+export ROS_PYTHON_VERSION=3
+conda deactivate
+. ~/kinova_venv/bin/activate
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+
+python ~/sim-to-real-kinova/src/sim-to-real-kinova-master/object_detection_pkg/src/camera_cal.py
+```
+
+Step 4: You're done. Make sure any code that utilizes OpenCV / AruCo stuff is pointed to the correct `camera_mtx.npy` and `dist_mtx.npy`.
+
+
+
+TODO: write more documentation (when brain is fried)
+
+If you want to run `grasp_classifier_test.py`:
+
+Step 1: Teleoperate and get sample joints.
+
+
+
+Places where you'll need to change the joint angles (in `kinova_gripper_env.py`:
+
+`self.lift_pose`: The lifting pose?
+
+`self.goal_pose`: The goal pose?
+
+`self.home_angle`: The pose to start out
+
+`self.pre_grasp_angle`: Useless... The pose right before attempting a grasp.
+
+And you'll need to supply at least one array of joint angles in `grasp_classifier_test.py` in the `robot_grasp_joints` variable.
+
+
+
+Step 5: Running the `grasp_classifier_test.py` code:
+
+
+
+Terminal A:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch kinova_bringup kinova_robot.launch kinova_robotType:=j2s7s300
+```
+
+Terminal B:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch j2s7s300_moveit_config j2s7s300_demo.launch
+```
+
+Terminal C:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch grasp_classifier_individual_sim_2_real kinova_grasp_classifier_test_sim2real.launch
+```
+
+
+
+
+
+TODO: finish this shit
+
+
+
 
 
 TODO:
@@ -302,3 +406,122 @@ Unrelated step: Teleoperate to make the joint angles.
 Joint position can be observed by echoing two topics: `/'${kinova_robotType}_driver'/out/joint_angles` (in degree) and `/'${kinova_robotType}_driver'/out/state/position` (in radians including finger information)
 
 **eg**: `rostopic echo -c /m1n4s200_driver/out/joint_state` will print out joint names (rad), position, velocity (rad/s) and effort (Nm) information.
+
+
+
+Pain train begins...
+
+Terminal A:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch j2s7s300_moveit_config j2s7s300_demo.launch
+```
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch kinova_bringup kinova_robot.launch kinova_robotType:=j2s7s300
+```
+
+Make a directory for the transform matrix dictionary first:
+
+```
+mkdir ~/sim-to-real-kinova/src/kinova-ros/kinova_scrpits/src/data/
+```
+
+
+
+
+
+
+
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+rosrun kinova_scripts transfromMatrix.py 0
+python2 ~/sim-to-real-kinova/src/kinova-ros/kinova_scrpits/src/transfromMatrix.py
+
+python3 ~/sim-to-real-kinova/src/kinova-ros/kinova_scrpits/src/arm_calibration.py
+```
+
+0 - intial location
+
+1 - front left
+
+2 - front right
+
+3 - back right
+
+4 - back left
+
+5 - center
+
+
+
+
+
+
+
+### Running adam's openai gym test
+
+
+
+some other terminal:
+
+```
+roscore
+```
+
+
+
+Terminal A:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch kinova_bringup kinova_robot.launch kinova_robotType:=j2s7s300
+```
+
+Terminal B:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch j2s7s300_moveit_config j2s7s300_demo.launch
+```
+
+Terminal C:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch openai_gym_kinova test_adams_gym.launch
+```
+
