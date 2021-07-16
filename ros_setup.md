@@ -459,7 +459,8 @@ python2 ~/sim-to-real-kinova/src/kinova-ros/kinova_scrpits/src/transfromMatrix.p
 python3 ~/sim-to-real-kinova/src/kinova-ros/kinova_scrpits/src/arm_calibration.py
 ```
 
-0 - intial location
+0 - intial locationprint('rotation vectors',rvecs)
+print('transl')
 
 1 - front left
 
@@ -479,12 +480,25 @@ python3 ~/sim-to-real-kinova/src/kinova-ros/kinova_scrpits/src/arm_calibration.p
 
 ### Running adam's openai gym test
 
+Echoing joint states:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+rostopic echo -c /j2s7s300_driver/out/joint_state
+```
+
 
 
 some other terminal:
 
 ```
-roscore
+roscoreprint('rotation vectors',rvecs)
+print('transl')
 ```
 
 
@@ -523,5 +537,178 @@ conda deactivate
 cd ~/sim-to-real-kinova
 source devel/setup.bash
 roslaunch openai_gym_kinova test_adams_gym.launch
+```
+
+```
+rostopic pub -r 100 /j2s7s300_driver/in/joint_velocity  kinova_msgs/JointVelocity "{joint1: 2.0, joint2: 2.0, joint3: 2.0}"
+FingerTorq
+rostopic pub -r 100 /j2s7s300_driver/in/cartesian_velocity kinova_msgs/PoseVelocity "{twist_linear_x: 0.0, twist_linear_y: 0.0, twist_linear_z: 0.0, twist_angular_x: 0.0, twist_angular_y: 0.0, twist_angular_z: 0.0, finger1: 1.0, finger2: 1.0, finger3: 1.0}"
+
+
+rostopic pub -r 100 /j2s7s300_driver/in/cartesian_velocity kinova_msgs/PoseVelocity "{twist_linear_x: 0.0, twist_linear_y: 0.0, twist_linear_z: 0.0, twist_angular_x: 0.0, twist_angular_y: 0.0, twist_angular_z: 0.0, finger1: 0.0, finger2: 0.0, finger3: 0.0}"
+
+
+```
+
+rosrun kinova_demo fingers_action_client.py j2s7s300 percent 100 100 100
+
+
+
+note: i had to get the right kinova_msgs and kinova_driver folder. you have to use this commit:
+
+https://github.com/Kinovarobotics/kinova-ros/commit/5a9cf3eb05bf957f9d9c95fb9c49c6ce8d48da04
+
+but you can only access from here: https://github.com/f371xx/kinova-ros
+
+I know, it makes no fucking sense. it even got merged.
+
+```
+THIS WROKS TO CLOSE THE FINGERS YAY
+
+
+
+
+rostopic pub -r 100 /j2s7s300_driver/in/cartesian_velocity_with_finger_velocity kinova_msgs/PoseVelocityWithFingerVelocity "{twist_linear_x: 0.0, twist_linear_y: 0.0, twist_linear_z: 0.0, twist_angular_x: 0.0, twist_angular_y: 0.0, twist_angular_z: 0.0, finger1: 1000.0, finger2: 1000.0, finger3: 1000.0}"
+
+```
+
+
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch openai_gym_kinova test_adams_cartesian
+```
+
+
+
+
+
+```
+# move the kinova scripts
+cp -r ~/kinova_rl/misc/Kinova-simulation-in-Rviz/kinova_scrpits/ ~/sim-to-real-kinova/src/kinova-ros/
+
+# replace kinova meshes with the aruco-attached meshes
+cp -r ~/kinova_rl/misc/Kinova-simulation-in-Rviz/meshes/ ~/sim-to-real-kinova/src/kinova-ros/kinova_description/
+
+# replace kinova urdf with aruco-attached urdf
+cp -r ~/kinova_rl/misc/Kinova-simulation-in-Rviz/urdf/ ~/sim-to-real-kinova/src/kinova-ros/kinova_description/
+
+# replace launch files for our virtual robot.
+cp ~/kinova_rl/misc/Kinova-simulation-in-Rviz/j2s7s300_virtual_robot_demo.launch ~/sim-to-real-kinova/src/kinova-ros/kinova_moveit/robot_configs/j2s7s300_moveit_config/launch/j2s7s300_virtual_robot_demo.launch
+```
+
+
+
+
+
+
+
+### Refactoring hell / Documentation
+
+1. Steps on how to setup up your orientations (run log_cartesian_orientation.launch, writing stuff)
+2. Turn arm control (go to pose) into an action
+
+
+
+
+
+
+
+# Running the gym environment
+
+1. Setup your camera calibration
+2. Setup your ROS terminals
+3. Setup your orientations for home, pregrasp, lift reward, etc.
+4. Run test code
+
+
+
+### setting up your camera calibration
+
+copy paste above section
+
+### Setup your ROS terminals
+
+Terminal A:
+
+```
+roscore
+```
+
+Terminal B:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch kinova_bringup kinova_robot.launch kinova_robotType:=j2s7s300
+```
+
+Terminal C:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch j2s7s300_moveit_config j2s7s300_demo.launch
+```
+
+
+
+### Setting up your orientations.
+
+Terminal D:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch openai_gym_kinova log_cartesian_orientation.launch
+```
+
+You should begin seeing some terminal output. This should contain positions, and orientations. Use this information to form orientations for your 4 positions:
+
+`[pos_x, pos_y, pos_z, orientation_x, orientation_y, orientation_z, orientation_w]`
+
+
+
+The order that the arm will go along:
+
+1. `self.home_orientation_cartesian` - the initial position. pick a spot that will make reaching the pregrasp position easy.
+2. `self.pre_grasp_orientation_cartesian` - the position where the open gripper will begin to close.
+3. grasp planner used here
+4. `self.manual_lift_pose_cartesian` - the arm manually lifts the object to this position. pick a higher position from your pregrasp orientation
+5. `self.check_reward_orientation_cartesian` - should move the object to the right side of the camera, where a cropped region evaluates the success of the grasp. The arm and aruco markers should completely fit inside the cropped image (when running `log_cartesian_orientation.launch`, a window containing the image view of the reward detection algorithm should pop up for your reference.)
+
+Starting around line 56.
+
+
+
+### Test out your stuff
+
+Terminal D:
+
+```
+cd ~/
+conda deactivate
+. kinova_venv/bin/activate
+
+cd ~/sim-to-real-kinova
+source devel/setup.bash
+roslaunch openai_gym_kinova test_adams_cartesian_path.launch
 ```
 
