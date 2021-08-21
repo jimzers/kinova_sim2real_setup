@@ -24,6 +24,7 @@ pip install -U pip wheel
 pip install numpy torch scipy pandas opencv-python opencv-contrib-python
 pip uninstall em
 pip install empy
+pip install pandas imageio
 
 export ROS_PYTHON_VERSION=3
 ```
@@ -543,7 +544,7 @@ roslaunch openai_gym_kinova test_adams_gym.launch
 rostopic pub -r 100 /j2s7s300_driver/in/joint_velocity  kinova_msgs/JointVelocity "{joint1: 2.0, joint2: 2.0, joint3: 2.0}"
 FingerTorq
 rostopic pub -r 100 /j2s7s300_driver/in/cartesian_velocity kinova_msgs/PoseVelocity "{twist_linear_x: 0.0, twist_linear_y: 0.0, twist_linear_z: 0.0, twist_angular_x: 0.0, twist_angular_y: 0.0, twist_angular_z: 0.0, finger1: 1.0, finger2: 1.0, finger3: 1.0}"
-
+joint_angle_client
 
 rostopic pub -r 100 /j2s7s300_driver/in/cartesian_velocity kinova_msgs/PoseVelocity "{twist_linear_x: 0.0, twist_linear_y: 0.0, twist_linear_z: 0.0, twist_angular_x: 0.0, twist_angular_y: 0.0, twist_angular_z: 0.0, finger1: 0.0, finger2: 0.0, finger3: 0.0}"
 
@@ -621,7 +622,7 @@ cp ~/kinova_rl/misc/Kinova-simulation-in-Rviz/j2s7s300_virtual_robot_demo.launch
 
 # Running the gym environment
 
-1. Setup your camera calibration
+1. Setup your camera calibrationjoint_angle_client
 2. Setup your ROS terminals
 3. Setup your orientations for home, pregrasp, lift reward, etc.
 4. Run test code
@@ -684,7 +685,7 @@ You should begin seeing some terminal output. This should contain positions, and
 
 `[pos_x, pos_y, pos_z, orientation_x, orientation_y, orientation_z, orientation_w]`
 
-
+joint_angle_clientjoint_angle_client
 
 The order that the arm will go along:
 
@@ -710,5 +711,566 @@ conda deactivate
 cd ~/sim-to-real-kinova
 source devel/setup.bash
 roslaunch openai_gym_kinova test_adams_cartesian_path.launch
+```
+
+rosrun kinova_demo fingers_action_client.py j2s7s300 percent 100 100 100
+
+
+
+setup gym shit
+
+```
+pip install gym
+
+cd ~/
+mkdir pip_fodder
+cd pip_fodder
+```
+
+
+
+Set up mujoco py
+
+```
+# get osmesa and opengl shit
+sudo apt-get install libosmesa6-dev
+
+cd ~/
+mkdir ~/pip_fodder
+cd ~/pip_fodder
+
+wget -O mjpro150.zip https://www.roboti.us/download/mjpro150_linux.zip
+mkdir ~/.mujoco
+unzip mjpro150.zip -d ~/.mujoco
+
+cp ~/mjkey.txt ~/.mujoco
+cp ~/mjkey.txt ~/.mujoco/mjpro150/bin
+
+export LD_LIBRARY_PATH=/home/mechagodzilla/.mujoco/mjpro150/bin:$LD_LIBRARY_PATH
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
+
+wget -O mujoco_py.zip https://github.com/openai/mujoco-py/archive/refs/tags/1.50.1.0.zip
+unzip mujoco_py.zip 
+cd mujoco-py-1.50.1.0/
+pip install -e .
+
+pip install gym
+
+```
+
+
+
+Extra notes:
+
+If your arm is too fucking slow, use `joint_limits.yaml` to make it go fASTER!!! change the `max_velocity` param for each joint
+
+https://github.com/ros-planning/moveit/issues/797 < talks about cartesian path planning
+
+
+
+Additional information to supplement URDFs are in SRDFs. fun fact I found my collision parameters there.
+
+
+
+Missing GL version?
+
+```
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
+```
+
+
+
+Making the right camera load up:
+
+```
+a = self._sim.render(width=w, height=h, depth=True, mode='offscreen', camera_name='camera')
+```
+
+And in every case where you define a new viewer:
+
+```
+self._viewer = MjViewer(self._sim)
+self._viewer.cam.fixedcamid = 0  # set to the camera provided by the simulator!!!
+self._viewer.cam.type = 2  # constant for CAMERA_FIXED
+```
+
+And in your XML file that you load into mujoco, replace your camera tag with this:
+
+```
+<camera euler="-0 0 0" mode="fixed" name="camera" pos="0 0 1" />
+```
+
+
+
+testing file:
+
+check out this:
+
+```
+python src/sim-to-real-kinova-master/openai_gym_kinova/src/gym_kinova_gripper/envs/kinova_description/test.py
+```
+
+
+
+
+
+In simulation:
+
+positive y: move into the hand
+
+negative y: move away from hand
+
+positive x: moves towards two finger side
+
+negative x: moves toward single finger side
+
+
+
+
+
+In real life:
+
+positive y:  in the direction into the hand
+
+negative y: in the direction away from the hand
+
+positive x: in the direction of the single finger
+
+negative x: in the direction of the two fingers
+
+positive z: up
+
+negative z: down
+
+
+
+notes: if you move hand in one set of experiments and the object in another, you can invert the x axis and y axis
+
+
+
+note: in the 
+
+
+
+```
+"""
+For action space:
+1. How fast the fingers close => how many timesteps to hit the "closed" state?
+2. 
+
+For reward space:
+1. Draw a plot based on the XY noise successes:
+
+there are 4 scenarios
+1. agreement:
+- both succeed
+- both fail
+
+2. disagreement:
+- sim succeeds reality fails
+- sim fails reality succeeds
+
+For observation space:
+For all individual states:
+1. print graph of deltas between two states. should look flat.
+2. print both sim and real states going at each other...
+3. 
+
+
+How to start:
+0. collect the two logging directories
+1. data structure to store dual replay buffers for both sim and real.
+- call by trial numbers (and the corresponding noise assigned)
+- actions
+- states (call by a specific variable)
+- rewards?
+
+2. load past csvs?
+
+3. do reward comparisons
+4. do observation comparisons
+5. do action comparions
+
+
+extras:
+overlay simulation over real world gif???
+
+"""
+```
+
+
+
+
+
+```
+pip install imageio-ffmpeg
+
+sudo apt-get install python3-tk
+```
+
+
+
+
+
+TODO:
+
+add dots
+
+
+
+Adding to the mujoco thing:
+
+Add forcelimited and forcerange to the actuators. This changes how much force the actuator can actually output. Forcerange will define the min and max amounts the actuator can give.
+
+```
+forcelimited="true" forcerange="0 1"
+```
+
+
+
+Friction parameter:
+
+first 2 are tangental
+
+first 2 are sliding
+
+last 1 is rolling
+
+
+
+
+
+stiffness
+
+detection problesm: lighting issues with aruco. adjust shade or whatever
+
+
+
+```
+RuntimeError: CUDA error: CUBLAS_STATUS_INVALID_VALUE when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+```
+
+https://discuss.pytorch.org/t/runtimeerror-cuda-error-cublas-status-invalid-value-when-calling-cublassgemm-handle-opa-opb-m-n-k-alpha-a-lda-b-ldb-beta-c-ldc/124544
+
+NOT ENOUGH VRAM HOLY MOLY
+
+
+
+For the peoples getting this error and ending up on this post, please  know that it can also be caused if you have a mismatch between the  dimension of your input tensor and the dimensions of your nn.Linear  module. (ex. x.shape = (a, b) and nn.Linear(c, c, bias=False) with c not matching)
+
+
+
+`pip install wandb`
+
+read instructions on setting up weights and biases at https://docs.wandb.ai/guides/integrations/pytorch 
+
+https://docs.wandb.ai/guides/track/log
+
+
+
+useless code:
+
+```
+class ExpertPIDController(object):
+    """
+    Fun fact: This isn't really a PID controller. It's just a hardcoded nudging strategy!
+
+    """
+
+    def __init__(self, obj_init_pos):
+        self.prev_f1jA = 0.0
+        self.prev_f2jA = 0.0
+        self.prev_f3jA = 0.0
+        self.step = 0.0
+        self.init_obj_pose = obj_init_pos  # X position of object
+        # self.init_obj_pose = self._sim.data.get_geom_xpos(object)
+        # self.init_dot_prod = obj_init_dot_prod  # dot product of object wrt palm
+        self.f1_vels = []
+        self.f2_vels = []
+        self.f3_vels = []
+        self.wrist_vels = []
+
+    def _count(self):
+        self.step += 1
+
+    def center_action(self, constant_velocity, wrist_lift_velocity, finger_lift_velocity, curr_obj_pose, lift_check):
+        """ Object is in a center location within the hand, so lift with constant velocity or adjust for lifting """
+        wrist, f1, f2, f3 = 0, constant_velocity, constant_velocity, constant_velocity
+
+        # cartesian distance from original starting position
+        curr_dist_traveled = np.sqrt((curr_obj_pose[:2] - self.init_obj_pose[
+                                                          :2]) ** 2)  # we only index 2, ensuring we only grab x and y dimensions
+
+        # Check if change in object dot product to wrist center versus the initial dot product is greater than 0.01
+        if curr_dist_traveled > 0.05:
+            # print("CHECK 2: Obj dot product to wrist has changed more than 0.01")
+            # Start lowering velocity of finger 2 and 3 so the balance of force is equal (no tipping)
+            f1, f2, f3 = constant_velocity, (constant_velocity / 2), (constant_velocity / 2)
+
+        # Lift check determined by grasp check (distal finger tip movements)
+        # and this check has occurred over multiple time steps
+        if lift_check is True:
+            # Ready to lift, so slow down Finger 1 to allow for desired grip
+            # (where Fingers 2 and 3 have dominance)
+            # print("Check 2A: Object is grasped, ready for lift")
+            f1, f2, f3 = (finger_lift_velocity / 2), finger_lift_velocity, finger_lift_velocity
+        return np.array([f1, f2, f3])
+
+    def right_action(self, pid, states, min_velocity, wrist_lift_velocity, finger_lift_velocity, curr_obj_pose,
+                     lift_check, velocities):
+        """ Object is in an extreme right-side location within the hand, so Finger 2 and 3 move the
+        object closer to the center """
+        # cartesian distance from original starting position
+        curr_dist_traveled = np.sqrt((curr_obj_pose[:2] - self.init_obj_pose[
+                                                          :2]) ** 2)  # we only index 2, ensuring we only grab x and y dimensions
+
+        # Only Small change in object dot prod to wrist from initial position, must move more
+        # Object has not moved much, we want the fingers to move closer to the object to move it
+        if curr_dist_traveled < 0.05:
+            """ PRE-contact """
+            # print("CHECK 5: Only Small change in object dot prod to wrist, moving f2 & f3")
+            f1 = 0.0  # frontal finger doesn't move
+            f2 = pid.touch_vel(curr_obj_pose, states[79], velocities)  # f2_dist dot product to object
+            f3 = f2  # other double side finger moves at same speed
+            wrist = 0.0
+        else:
+            """ POST-contact """
+            # now finger-object distance has been changed a decent amount.
+            # print("CHECK 6: Object dot prod to wrist has Changed More than 0.01")
+            # Goal is 1 b/c obj_dot_prod is based on comparison of two normalized vectors
+            if abs(1 - obj_dot_prod) > 0.01:
+                # print("CHECK 7: Obj dot prod to wrist is > 0.01, so moving ALL f1, f2 & f3")
+                # start to close the PID stuff
+                f1 = min_velocity  # frontal finger moves slightly
+                f2 = pid.velocity(obj_dot_prod, velocities)  # get PID velocity
+                f3 = f2  # other double side finger moves at same speed
+                wrist = 0.0
+            else:  # goal is within 0.01 of being reached:
+                # print("CHECK 8: Obj dot prod to wrist is Within reach of 0.01 or less, Move F1 Only")
+                # start to close from the first finger
+                f1 = pid.touch_vel(obj_dot_prod, states[78], velocities)  # f1_dist dot product to object
+                f2 = 0.0
+                f3 = 0.0
+                wrist = 0.0
+
+            # print("Check 9a: Check for grasp (small distal finger movement)")
+            # Lift check determined by grasp check (distal finger tip movements)
+            # and this check has occurred over multiple time steps
+            if lift_check is True:
+                # print("CHECK 9: Yes! Good grasp, move ALL fingers")
+                f1, f2, f3 = (finger_lift_velocity / 2), finger_lift_velocity, finger_lift_velocity
+
+        return np.array([f1, f2, f3])
+
+    def left_action(self, pid, states, min_velocity, wrist_lift_velocity, finger_lift_velocity, obj_dot_prod,
+                    lift_check, velocities):
+        """ Object is in an extreme left-side location within the hand, so Finger 1 moves the
+                object closer to the center """
+        # Only Small change in object dot prod to wrist from initial position, must move more
+        if abs(obj_dot_prod - self.init_dot_prod) < 0.01:
+            """ PRE-contact """
+            # print("CHECK 11: Only Small change in object dot prod to wrist, moving F1")
+            f1 = pid.touch_vel(obj_dot_prod, states[78], velocities)  # f1_dist dot product to object
+            f2 = 0.0
+            f3 = 0.0
+            wrist = 0.0
+        else:
+            """ POST-contact """
+            # now finger-object distance has been changed a decent amount.
+            # print("CHECK 12: Object dot prod to wrist has Changed More than 0.01")
+            # Goal is 1 b/c obj_dot_prod is based on comparison of two normalized vectors
+            if abs(1 - obj_dot_prod) > 0.01:
+                # print("CHECK 13: Obj dot prod to wrist is > 0.01, so kep moving f1, f2 & f3")
+                f1 = pid.velocity(obj_dot_prod, velocities)
+                f2 = min_velocity  # 0.05
+                f3 = min_velocity  # 0.05
+                wrist = 0.0
+            else:
+                # Goal is within 0.01 of being reached:
+                # print("CHECK 14: Obj dot prod to wrist is Within reach of 0.01 or less, Move F2 & F3 Only")
+                # start to close from the first finger
+                # nudge with thumb
+                f2 = pid.touch_vel(obj_dot_prod, states[79], velocities)  # f2_dist dot product to object
+                f3 = f2
+                f1 = 0.0
+                wrist = 0.0
+
+            # print("Check 15a: Check for grasp (small distal finger movement)")
+            # Lift check determined by grasp check (distal finger tip movements)
+            # and this check has occurred over multiple time steps
+            if lift_check is True:
+                # print("CHECK 15b: Good grasp - moving ALL fingers")
+                f1, f2, f3 = (finger_lift_velocity / 2), finger_lift_velocity, finger_lift_velocity
+        return np.array([f1, f2, f3])
+
+    def PDController(self, lift_check, curr_obj_pos, action_space, velocities):
+        """ Position-Dependent (PD) Controller that is dependent on the x-axis coordinate position of the object to
+        determine the individual finger velocities.
+        """
+        pid = PID(action_space)  # Define pid controller
+        obj_dot_prod = obj_dot_prod  # Dot product of object wrt palm
+
+        # Define action (finger velocities)
+        f1 = 0.0  # far out finger, on single side
+        f2 = 0.0  # double side finger - right top
+        f3 = 0.0  # double side finger - right bottom
+        wrist = 0.0
+
+        # Velocity variables (for readability)
+        constant_velocity = velocities["constant_velocity"]
+        wrist_lift_velocity = velocities["wrist_lift_velocity"]
+        finger_lift_velocity = velocities["finger_lift_velocity"]
+        min_velocity = velocities["min_velocity"] + 1.3  # Add 1.3 so fingers are always moving
+        max_velocity = velocities["max_velocity"]
+
+        # Note: only comparing initial X position of object. because we know
+        # the hand starts at the same position every time (close to origin)
+
+        # Check if the object is near the center area (less than x-axis 0.03)
+        if abs(self.init_obj_pose) <= 0.03:
+            # print("CHECK 1: Object is near the center")
+            controller_action = self.center_action(constant_velocity, wrist_lift_velocity, finger_lift_velocity,
+                                                   obj_dot_prod, lift_check)
+        else:
+            # print("CHECK 3: Object is on extreme left OR right sides")
+            # Object on right hand side, move 2-fingered side
+            # Local representation: POS X --> object is on the RIGHT (two fingered) side of hand
+            if self.init_obj_pose > 0.0:
+                # print("CHECK 4: Object is on RIGHT side")
+                controller_action = self.right_action(pid, states, min_velocity, wrist_lift_velocity,
+                                                      finger_lift_velocity, obj_dot_prod, lift_check, velocities)
+
+            # object on left hand side, move 1-fingered side
+            # Local representation: NEG X --> object is on the LEFT (thumb) side of hand
+            else:
+                # print("CHECK 10: Object is on the LEFT side")
+                controller_action = self.left_action(pid, states, min_velocity, wrist_lift_velocity,
+                                                     finger_lift_velocity, obj_dot_prod, lift_check, velocities)
+
+        self._count()
+        controller_action = check_vel_in_range(controller_action, min_velocity, max_velocity, finger_lift_velocity)
+
+        # print("f1: ", controller_action[0], " f2: ", controller_action[1], " f3: ", controller_action[2])
+        self.f1_vels.append(f1)
+        self.f2_vels.append(f2)
+        self.f3_vels.append(f3)
+        self.wrist_vels.append(wrist)
+
+        return controller_action, self.f1_vels, self.f2_vels, self.f3_vels, self.wrist_vels
+
+
+def check_vel_in_range(action, min_velocity, max_velocity, finger_lift_velocity):
+    """ Checks that each of the finger/wrist velocies values are in range of min/max values """
+    for idx in range(len(action)):
+        if idx > 0:
+            if action[idx] < min_velocity:
+                if action[idx] != 0 or action[idx] != finger_lift_velocity or action[idx] != finger_lift_velocity / 2:
+                    action[idx] = min_velocity
+            elif action[idx] > max_velocity:
+                action[idx] = max_velocity
+
+    return action
+
+
+class PID(object):
+    def __init__(self, min_speed=0, max_speed=1.5):
+        self.kp = 1
+        self.kd = 1
+        self.ki = 1
+        self.prev_err = 0.0
+        self.sampling_time = 15
+        self.action_range = [min_speed, max_speed]
+        self.max_speed = max_speed
+
+        self.set_point = 0  # ideally, which
+
+        # TODO: wtf, the velocity is not set properly...,
+
+        # how it used to work: we wanted to reduce the orientation between the two fingers...
+        # do we want a separate pid controller for each finger?
+
+    def velocity(self, dot_prod, velocities):
+        err = 0 - dot_prod
+        diff = (err) / self.sampling_time
+        vel = err * self.kp + diff * self.kd
+        vel = (vel / 1.25)  # 1.25 means dot product equals to 1
+
+        # Scale the velocity to the maximum velocity -
+        # the PID was determined originally with a max of self.max_speed rad/sec
+        action = (vel / self.max_speed) * velocities["max_velocity"]
+
+        return action
+
+    def joint(self, dot_prod):
+        err = 1 - dot_prod
+        diff = (err) / self.sampling_time
+        joint = err * self.kp + diff * self.kd
+        action = (joint / 1.25) * 2  # 1.25 means dot product equals to 1
+        return action
+
+    def touch_vel(self, obj_dotprod, finger_dotprod, velocities):
+        err = obj_dotprod - finger_dotprod  # this really should be set point - variable point
+        diff = err / self.sampling_time
+        vel = err * self.kp + diff * self.kd
+
+        action = (vel / self.max_speed) * velocities["max_velocity"]
+
+        return action
+
+
+# function to get the dot product. Only used for the pid controller
+def _get_dot_product(self, obj_state=None):
+    if obj_state == None:
+        obj_state = self._get_obj_pose()
+    hand_pose = self._sim.data.get_body_xpos("j2s7s300_link_7")
+    obj_state_x = abs(obj_state[0] - hand_pose[0])
+    obj_state_y = abs(obj_state[1] - hand_pose[1])
+    obj_vec = np.array([obj_state_x, obj_state_y])
+    obj_vec_norm = np.linalg.norm(obj_vec)
+    obj_unit_vec = obj_vec / obj_vec_norm
+
+    center_x = abs(0.0 - hand_pose[0])
+    center_y = abs(0.0 - hand_pose[1])
+    center_vec = np.array([center_x, center_y])
+    center_vec_norm = np.linalg.norm(center_vec)
+    center_unit_vec = center_vec / center_vec_norm
+
+    dot_prod = np.dot(obj_unit_vec, center_unit_vec)
+    return dot_prod ** 20  # cuspy to get distinct reward
+
+```
+
+
+
+
+
+
+
+lmao rewriting the coordinates
+
+```
+new_coord_arr = []
+
+with open('CubeM.txt', 'r') as file:
+    for line in file:
+        line_coord_arr = line.strip().split(',')
+        line_coord_arr[2] = '0.0555'  # new height
+        new_coord_str = ','.join(line_coord_arr)
+#         print(new_coord_str)
+        new_coord_arr.append(new_coord_str)
+    
+with open('CylinderM.txt', 'w') as file:
+    for line in new_coord_arr:
+        file.write(line + '\n')
+        
+
+with open('Cone1M.txt', 'w') as file:
+    for line in new_coord_arr:
+        file.write(line + '\n')
+        
+        
+with open('Vase1M.txt', 'w') as file:
+    for line in new_coord_arr:
+        file.write(line + '\n')
 ```
 
